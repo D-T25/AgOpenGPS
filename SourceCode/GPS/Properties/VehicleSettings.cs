@@ -76,6 +76,8 @@ namespace AgOpenGPS.Properties
         public string setRowGuidance_comPort = "";
         public int setRowGuidance_centerMillivolts = 2500;
         public bool setRowGuidance_invert = false;
+        public int setRowGuidance_rightCenterMillivolts = 2500;
+        public bool setRowGuidance_rightInvert = false;
         public int setRowGuidance_deadbandMillivolts = 40;
         public double setRowGuidance_gainDegreesPerVolt = 1.0;
         public double setRowGuidance_maxCorrectionDegrees = 3.0;
