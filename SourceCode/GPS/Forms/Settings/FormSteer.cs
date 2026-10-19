@@ -28,6 +28,26 @@ namespace AgOpenGPS
         {
             mf = callingForm as FormGPS;
             InitializeComponent();
+
+            // Row-sensor diagnostics are read-only; they do not enable steering.
+            var rowSensorButton = new Button
+            {
+                Text = "Row Sensor\nDiagnostics",
+                Location = new Point(500, 558),
+                Size = new Size(125, 64),
+                BackColor = Color.FromArgb(50, 50, 70),
+                ForeColor = Color.White,
+                FlatStyle = FlatStyle.Flat,
+                Font = new Font("Microsoft Sans Serif", 10F, FontStyle.Bold),
+                UseVisualStyleBackColor = false
+            };
+            rowSensorButton.Click += (sender, args) =>
+            {
+                using (var diagnostics = new FormRowSensorDiagnostics())
+                    diagnostics.ShowDialog(this);
+            };
+            Controls.Add(rowSensorButton);
+
             nudMaxCounts.Controls[0].Enabled = false;
 
             nudSnapDistance.Controls[0].Enabled = false;
