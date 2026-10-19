@@ -20,6 +20,6 @@ The Nano uses 115200 baud. On a classic Nano, ADC counts range from 0 to 1023. T
 
 ## Current scope
 
-The branch includes a read-only diagnostics view plus a harvester-only Row Guidance Setup screen in Auto Steer Configuration. The setup screen stores the selected mode, COM port, center voltage, direction, deadband, correction gain/limit, engage delay, and filter factor in the current vehicle profile.
+The branch includes a harvester-only Row Guidance Setup screen in Auto Steer Configuration. The setup screen stores the selected mode, COM port, center voltage, direction, deadband, correction gain/limit, engage delay, and filter factor in the current vehicle profile. A single AOG-owned USB reader supplies both the diagnostics view and the row-guidance calculation.
 
-The engage control currently checks the operator interface only. AOG does not yet read live packets into the steering loop, and no row-feeler mode changes the steering command. The steering-output feature flag is intentionally off. Build and verify serial parsing, signal-loss handling, mode transitions, and constrained steering behavior before enabling it.
+The steering calculation now produces a bounded row-corrected candidate target for GPS-plus-feeler and feeler-only modes. GPS-plus-feeler falls back to the GPS target when packets are stale; feeler-only refuses the candidate without fresh data. Row assist is bypassed and disarmed on U-turns and when AutoSteer is disengaged. The steering-output hard-off in `RowGuidanceRuntime.SteeringOutputEnabled` remains `false`, so the candidate is not sent to the steer PGN. Build and verify serial parsing, signal-loss handling, mode transitions, correction direction, and bounded steering behavior before changing that flag.
