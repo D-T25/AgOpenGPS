@@ -1,4 +1,5 @@
 using AgOpenGPS.Properties;
+using AgOpenGPS.Classes.RowGuidance;
 using System;
 using System.Drawing;
 using System.IO.Ports;
@@ -13,10 +14,6 @@ namespace AgOpenGPS
     /// </summary>
     public sealed class FormRowGuidanceSettings : Form
     {
-        // Keep false until the USB reader, stale-data handling, and steering
-        // output path have been built and verified on the target Windows setup.
-        private const bool SteeringOutputEnabled = false;
-
         private readonly ComboBox _mode = new ComboBox();
         private readonly ComboBox _port = new ComboBox();
         private readonly NumericUpDown _center = Number(500, 1000, 4500, 2500, 0);
@@ -28,10 +25,12 @@ namespace AgOpenGPS
         private readonly NumericUpDown _filter = Number(100, 0, 1, 0.25M, 2);
         private readonly Button _engage = new Button();
         private readonly Label _status = new Label();
+        private readonly FormGPS _mainForm;
         private bool _armed;
 
-        public FormRowGuidanceSettings()
+        public FormRowGuidanceSettings(FormGPS mainForm)
         {
+            _mainForm = mainForm;
             Text = "Corn Row Guidance Setup";
             StartPosition = FormStartPosition.CenterParent;
             FormBorderStyle = FormBorderStyle.FixedDialog;
@@ -97,7 +96,12 @@ namespace AgOpenGPS
 
             LoadSettings();
             RefreshPorts();
-            FormClosing += (s, e) => { _armed = false; };
+            FormClosing += (s, e) =>
+            {
+                _armed = false;
+                _mainForm.isRowGuidanceEngaged = false;
+                _mainForm.rowGuidanceRuntime.SetEngaged(false);
+            };
         }
 
         private static NumericUpDown Number(int width, decimal min, decimal max, decimal value, int decimals)
@@ -148,9 +152,11 @@ namespace AgOpenGPS
 
         private void ToggleArm()
         {
-            if (!SteeringOutputEnabled)
+            if (!RowGuidanceRuntime.SteeringOutputEnabled)
             {
                 _armed = !_armed;
+                _mainForm.isRowGuidanceEngaged = _armed;
+                _mainForm.rowGuidanceRuntime.SetEngaged(_armed);
                 _engage.Text = _armed ? "Disengage row assist" : "Engage row assist";
                 _status.Text = _armed
                     ? "Armed for interface testing only. No steering command is sent."
@@ -172,7 +178,14 @@ namespace AgOpenGPS
             settings.setRowGuidance_engageDelaySeconds = (double)_delay.Value;
             settings.setRowGuidance_filterFactor = (double)_filter.Value;
             settings.Save();
-            _status.Text = "Settings saved to the current vehicle profile. Steering output remains disabled.";
+            _armed = false;
+            _mainForm.isRowGuidanceEngaged = false;
+            _mainForm.rowGuidanceRuntime.SetEngaged(false);
+            string error;
+            bool connected = _mainForm.rowGuidanceRuntime.Connect(settings.setRowGuidance_comPort, out error);
+            _status.Text = connected
+                ? "Settings saved. " + _mainForm.rowGuidanceRuntime.ConnectionStatus + ". Steering output remains disabled."
+                : "Settings saved, but Nano connection failed: " + error;
         }
     }
 }
