@@ -1,6 +1,7 @@
 ﻿//Please, if you use this, share the improvements
 
 using AgLibrary.Logging;
+using AgOpenGPS.Classes.RowGuidance;
 using AgOpenGPS.Core.Models;
 using System;
 using System.Collections.Generic;
@@ -978,6 +979,49 @@ namespace AgOpenGPS
                 {
                     vehicle.deadZoneDelayCounter = 0;
                     vehicle.isInDeadZone = false;
+                }
+
+                // Row-feeler correction is evaluated after AOG has calculated
+                // its normal guidance target. The candidate remains observable
+                // for diagnostics, but the compile-time hard-off prevents it
+                // from reaching the steering PGN in this prototype.
+                if (yt.isYouTurnBtnOn && isRowGuidanceEngaged)
+                {
+                    isRowGuidanceEngaged = false;
+                    rowGuidanceRuntime.SetEngaged(false);
+                }
+
+                double gpsTargetDegrees = guidanceLineSteerAngle * 0.01;
+                double rowCandidateDegrees = rowGuidanceRuntime.CalculateCandidateTarget(
+                    gpsTargetDegrees,
+                    Properties.VehicleSettings.Default,
+                    isRowGuidanceEngaged,
+                    yt.isYouTurnBtnOn,
+                    isReverse,
+                    vehicle.maxSteerAngle,
+                    out bool rowDataValid,
+                    out bool rowAssistReady,
+                    out _);
+
+                if (RowGuidanceRuntime.SteeringOutputEnabled && p_254.pgn[p_254.status] == 1)
+                {
+                    if (Properties.VehicleSettings.Default.setRowGuidance_mode == 2 &&
+                        isRowGuidanceEngaged && !rowAssistReady)
+                    {
+                        // Feeler-only cannot fall back to GPS steering or steer
+                        // before its fresh-data engage delay has elapsed.
+                        p_254.pgn[p_254.status] = 0;
+                        if (!rowDataValid || isReverse || yt.isYouTurnBtnOn)
+                        {
+                            isRowGuidanceEngaged = false;
+                            rowGuidanceRuntime.SetEngaged(false);
+                        }
+                    }
+                    else
+                    {
+                        guidanceLineSteerAngle = (short)Math.Round(
+                            rowCandidateDegrees * 100.0, MidpointRounding.AwayFromZero);
+                    }
                 }
 
                  if (!vehicle.isInDeadZone)
