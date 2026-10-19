@@ -114,13 +114,18 @@ namespace AgOpenGPS
                 return;
             }
 
-            _reading.Text = string.Format(CultureInfo.InvariantCulture,
-                "ADC: {0} / 1023     Sensor: {1:F3} V     Sequence: {2}",
-                packet.AdcCounts, packet.Millivolts / 1000.0, packet.Sequence);
+            _reading.Text = packet.ChannelCount == 2
+                ? string.Format(CultureInfo.InvariantCulture,
+                    "L: {0} / 1023, {1:F3} V    R: {2} / 1023, {3:F3} V",
+                    packet.LeftAdcCounts, packet.LeftMillivolts / 1000.0,
+                    packet.RightAdcCounts, packet.RightMillivolts / 1000.0)
+                : string.Format(CultureInfo.InvariantCulture,
+                    "1 sensor: {0} / 1023     {1:F3} V",
+                    packet.LeftAdcCounts, packet.LeftMillivolts / 1000.0);
             _age.Text = string.Format(CultureInfo.InvariantCulture,
-                "{0}; candidate {1:F2}° (not sent to steering)",
+                "{0}; {1} channel(s); candidate {2:F2}° (not sent to steering)",
                 ageSeconds > 1.0 ? string.Format(CultureInfo.InvariantCulture, "Last packet {0:F1} s ago", ageSeconds) : "Live data",
-                _runtime.CandidateSteerAngleDegrees);
+                packet.ChannelCount, _runtime.CandidateSteerAngleDegrees);
         }
     }
 }
