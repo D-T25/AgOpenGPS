@@ -19,6 +19,14 @@ AgOpenGPS WinForms has reached its final development stage (April 2026).
 
 Ag Precision Mapping and Section Control Software
 
+## Experimental corn row-feeler guidance
+
+This branch, [`corn-row-guidance`](https://github.com/D-T25/AgOpenGPS/tree/corn-row-guidance), contains an experimental AgOpenGPS integration for a corn-head row-feeler sensor. A Nano sends sensor readings to AgOpenGPS over USB serial; AgOpenGPS displays the data and calculates a bounded candidate correction alongside its normal GPS guidance target.
+
+**Steering output is hard-disabled in this prototype.** The row-feeler candidate is not sent to the steering controller. This branch is for compiling, bench checks, and sensor evaluation; it is not ready to steer a machine.
+
+See the [row-guidance README](Hardware/RowGuidanceNano/README.md) for the design, wiring notes, serial format, setup, and bench-test checklist.
+
 AgOpenGPS is 2 programs. AgIO is the communication hub to the outside world and AgOpenGPS is the 
 application. You can run either and within each, you can run the other.
 
