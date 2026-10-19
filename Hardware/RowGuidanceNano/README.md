@@ -6,29 +6,24 @@ Experimental AgOpenGPS integration for reading a corn-head row-feeler sensor thr
 
 ## What is included
 
-- Nano firmware that samples analog input A0 at 50 Hz and sends framed readings over USB.
-- AOG packet parsing and one shared serial connection for diagnostics and guidance calculations.
+- Nano firmware that samples A0 and A1 at 50 Hz and automatically sends one- or two-channel packets over USB.
+- AOG packet parsing for both channel counts and one shared serial connection for diagnostics and guidance calculations.
 - A harvester-only setup form with GPS-only, GPS-plus-feeler, and feeler-only modes.
-- Vehicle-profile settings for COM port, center voltage, correction direction, deadband, gain, maximum correction, engage delay, and filter strength.
+- Vehicle-profile settings for COM port, each channel's center voltage and direction, deadband, gain, maximum correction, engage delay, and filter strength.
 - Candidate correction calculation with stale-data behavior, turn bypass, and correction/vehicle-angle limits.
 
 ## One-sensor and two-sensor support
 
-**Current branch: one sensor channel.** The Nano reads A0, and AOG calibrates one voltage around one center value. A two-sensor setup is not implemented yet.
+The Nano and AOG now support both packet layouts. With one sensor, connect it to A0 and the Nano sends `ROW1`. With two separate sensors, connect left to A0 and right to A1; after ten consecutive plausible right-channel samples, the Nano switches to `ROW2`, and AOG detects the two-channel packet automatically. The switch to dual mode stays latched until the Nano restarts. If either channel then goes out of range, AOG marks the row data invalid rather than silently using only one sensor.
 
-Supporting either setup automatically takes changes in both the Nano firmware and AOG:
+Fit a 100 kOhm pull-down resistor from each sensor input (A0 and A1) to Nano ground so an unplugged input reads low instead of floating. In a one-sensor installation, at minimum A1 needs this pull-down to prevent false dual-sensor detection. Confirm the pull-down will not affect the actual sensor output. Automatic detection uses a prototype 0.7–4.3 V presence window; verify that against the actual sensor before relying on detection. The AOG runtime currently accepts 0.5–4.5 V as a usable channel range.
 
-- The Nano must read both analog inputs when two separate sensors are installed and send an explicit channel count plus both readings in each packet. AOG cannot reliably infer a disconnected analog input from a floating pin.
-- AOG must parse both packet layouts, show each channel in diagnostics, and calibrate the center and direction for each sensor.
-- The correction logic must be designed for the actual sensor placement and output behavior. Two separate sensors may provide a left/right error comparison; the right way to combine them depends on their geometry and signal polarity.
-- If one channel becomes invalid, AOG needs a defined fallback. It must not silently treat the remaining sensor as a valid pair or continue using stale readings.
-
-The intended user experience is automatic selection from the packet's declared sensor count, with one- or two-sensor calibration as appropriate. It will still require the correct sensors and wiring; it is not universal plug-and-play detection. This dual-channel support is **planned, not included** in the current one-channel prototype.
+Each channel has its own center-voltage and invert setting. AOG applies the shared gain, deadband, filter, and correction limit after normalizing both channels so positive values mean the same physical correction direction. In dual mode it requires both channels to be valid and rejects opposing non-neutral correction signs; otherwise it averages their normalized errors. That is a starting model, not a validated Deere-equivalent algorithm; sensor locations and signal polarity must be confirmed on the actual head.
 
 ## Data path
 
 1. The sensor voltage is read on Nano A0.
-2. The Nano sends `ROW1` packets over USB at 115200 baud.
+2. The Nano sends `ROW1` (one sensor) or `ROW2` (two sensors) packets over USB at 115200 baud.
 3. AgOpenGPS validates each packet and treats data older than 0.5 seconds as stale.
 4. The selected mode and calibration settings produce a candidate steering target.
 5. The hard-off gate prevents that candidate from being sent to the steering controller.
@@ -55,6 +50,7 @@ The initial sensor estimate was roughly 1–4 V with about 2.5 V centered. Treat
 
 ```text
 ROW1,<sequence>,<ADC counts>,<millivolts>\n
+ROW2,<sequence>,<left ADC>,<left millivolts>,<right ADC>,<right millivolts>\n
 ```
 
 The sketch uses 115200 baud, 8 data bits, no parity, and 1 stop bit. For a classic 5 V Nano, ADC readings are 0–1023. The sketch reports unsmoothed readings; filtering is configured in AgOpenGPS.
@@ -81,6 +77,8 @@ The sketch uses 115200 baud, 8 data bits, no parity, and 1 stop bit. For a class
 
 - [ ] Upload `RowGuidanceNano.ino` to the Nano.
 - [ ] Open a serial monitor at 115200 baud and confirm `ROW1` lines arrive about 50 times per second.
+- [ ] For one-sensor wiring, confirm A1 is held near ground with the 100 kOhm pull-down and the Nano stays in `ROW1` mode.
+- [ ] Add a second sensor to A1 and confirm the Nano changes to `ROW2` after its detection delay. Confirm it stays in `ROW2` if a channel is later unplugged.
 - [ ] Move the sensor through its range and confirm ADC counts and millivolts change smoothly without exceeding expected limits.
 - [ ] Close the serial monitor before connecting from AgOpenGPS, since only one program can own the COM port at a time.
 
@@ -93,6 +91,8 @@ The sketch uses 115200 baud, 8 data bits, no parity, and 1 stop bit. For a class
 - [ ] Increase the test signal offset and confirm the candidate follows the selected direction and stays within the correction cap and vehicle-angle limit.
 - [ ] Disengage row assist and AutoSteer; confirm the row-assist state clears. Confirm row assist is bypassed during a U-turn.
 - [ ] Reconnect the sensor after signal loss and confirm valid data returns before any candidate is considered ready.
+- [ ] In dual-channel mode, calibrate each channel separately; disconnect either channel and confirm AOG rejects the pair instead of silently reverting to one-channel correction.
+- [ ] With steering still disabled, move the sensors so their calibrated correction signs oppose; confirm AOG reports disagreement and rejects row guidance until the calibration or contact is corrected.
 
 ## Before any steering test
 
