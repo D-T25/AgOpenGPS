@@ -12,6 +12,19 @@ Experimental AgOpenGPS integration for reading a corn-head row-feeler sensor thr
 - Vehicle-profile settings for COM port, center voltage, correction direction, deadband, gain, maximum correction, engage delay, and filter strength.
 - Candidate correction calculation with stale-data behavior, turn bypass, and correction/vehicle-angle limits.
 
+## One-sensor and two-sensor support
+
+**Current branch: one sensor channel.** The Nano reads A0, and AOG calibrates one voltage around one center value. A two-sensor setup is not implemented yet.
+
+Supporting either setup automatically takes changes in both the Nano firmware and AOG:
+
+- The Nano must read both analog inputs when two separate sensors are installed and send an explicit channel count plus both readings in each packet. AOG cannot reliably infer a disconnected analog input from a floating pin.
+- AOG must parse both packet layouts, show each channel in diagnostics, and calibrate the center and direction for each sensor.
+- The correction logic must be designed for the actual sensor placement and output behavior. Two separate sensors may provide a left/right error comparison; the right way to combine them depends on their geometry and signal polarity.
+- If one channel becomes invalid, AOG needs a defined fallback. It must not silently treat the remaining sensor as a valid pair or continue using stale readings.
+
+The intended user experience is automatic selection from the packet's declared sensor count, with one- or two-sensor calibration as appropriate. It will still require the correct sensors and wiring; it is not universal plug-and-play detection. This dual-channel support is **planned, not included** in the current one-channel prototype.
+
 ## Data path
 
 1. The sensor voltage is read on Nano A0.
