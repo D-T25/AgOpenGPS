@@ -69,6 +69,19 @@ namespace AgOpenGPS.Properties
         public int setVehicle_vehicleType = 0;
         public double setVehicle_panicStopSpeed = 0;
 
+        // Corn row-feeler prototype. Values are stored per vehicle profile.
+        // Row guidance remains disabled in the steering output until explicitly
+        // enabled after the serial input and steering path have been verified.
+        public int setRowGuidance_mode = 0; // 0 GPS, 1 GPS + row sensor, 2 row sensor only
+        public string setRowGuidance_comPort = "";
+        public int setRowGuidance_centerMillivolts = 2500;
+        public bool setRowGuidance_invert = false;
+        public int setRowGuidance_deadbandMillivolts = 40;
+        public double setRowGuidance_gainDegreesPerVolt = 1.0;
+        public double setRowGuidance_maxCorrectionDegrees = 3.0;
+        public double setRowGuidance_engageDelaySeconds = 1.0;
+        public double setRowGuidance_filterFactor = 0.25;
+
         public LoadResult Load(string vehicleFileName)
         {
             string path = Path.Combine(RegistrySettings.vehiclesDirectory, vehicleFileName + ".xml");
