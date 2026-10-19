@@ -15,6 +15,8 @@ namespace AgOpenGPS.Classes.RowGuidance
     {
         public const bool SteeringOutputEnabled = false;
         private const double PacketTimeoutSeconds = 0.5;
+        private const int MinSensorMillivolts = 500;
+        private const int MaxSensorMillivolts = 4500;
 
         private readonly object _sync = new object();
         private readonly StringBuilder _buffer = new StringBuilder();
@@ -23,7 +25,9 @@ namespace AgOpenGPS.Classes.RowGuidance
         private DateTime _latestPacketUtc = DateTime.MinValue;
         private DateTime _engagedSinceUtc = DateTime.MinValue;
         private double _filteredMillivolts;
+        private double _filteredRightMillivolts;
         private bool _hasFilteredValue;
+        private bool _hasFilteredRightValue;
         private double _candidateSteerAngleDegrees;
         private string _connectionStatus = "Disconnected";
 
@@ -69,6 +73,7 @@ namespace AgOpenGPS.Classes.RowGuidance
                     _latestPacket = null;
                     _latestPacketUtc = DateTime.MinValue;
                     _hasFilteredValue = false;
+                    _hasFilteredRightValue = false;
                     _connectionStatus = "Connected to " + portName + "; waiting for ROW1 data";
                 }
                 return true;
@@ -92,6 +97,7 @@ namespace AgOpenGPS.Classes.RowGuidance
                 _latestPacket = null;
                 _latestPacketUtc = DateTime.MinValue;
                 _hasFilteredValue = false;
+                _hasFilteredRightValue = false;
                 _engagedSinceUtc = DateTime.MinValue;
                 _connectionStatus = "Disconnected";
             }
@@ -123,8 +129,11 @@ namespace AgOpenGPS.Classes.RowGuidance
             bool engaged, bool inTurn, bool reversing, double vehicleMaxSteerAngle,
             out bool rowDataValid, out bool rowAssistReady, out string status)
         {
-            rowDataValid = TryGetLatest(out RowSensorPacket packet, out double ageSeconds);
+            bool packetFresh = TryGetLatest(out RowSensorPacket packet, out double ageSeconds);
             rowAssistReady = false;
+            bool leftValid = packet != null && IsUsableChannel(packet.LeftMillivolts);
+            bool rightValid = packet != null && packet.ChannelCount == 2 && IsUsableChannel(packet.RightMillivolts);
+            rowDataValid = packetFresh && leftValid && (packet.ChannelCount == 1 || rightValid);
             int mode = Math.Max(0, Math.Min(2, settings.setRowGuidance_mode));
             if (mode == 0 || !engaged || inTurn)
             {
@@ -144,8 +153,9 @@ namespace AgOpenGPS.Classes.RowGuidance
                 {
                     _engagedSinceUtc = DateTime.MinValue;
                     _hasFilteredValue = false;
+                    _hasFilteredRightValue = false;
                 }
-                status = "No fresh row-sensor packet";
+                status = packetFresh ? "One or more row-sensor channels are outside the valid range" : "No fresh row-sensor packet";
                 return StoreCandidate(mode == 1 ? gpsTargetDegrees : 0.0);
             }
 
@@ -161,22 +171,37 @@ namespace AgOpenGPS.Classes.RowGuidance
                 }
 
                 double filter = Math.Max(0.0, Math.Min(1.0, settings.setRowGuidance_filterFactor));
-                double alpha = Math.Max(0.05, 1.0 - filter);
-                if (!_hasFilteredValue)
-                {
-                    _filteredMillivolts = packet.Millivolts;
-                    _hasFilteredValue = true;
-                }
-                else
-                {
-                    _filteredMillivolts += alpha * (packet.Millivolts - _filteredMillivolts);
-                }
-
-                double errorMillivolts = _filteredMillivolts - settings.setRowGuidance_centerMillivolts;
-                double deadband = Math.Max(0, settings.setRowGuidance_deadbandMillivolts);
-                if (Math.Abs(errorMillivolts) <= deadband) errorMillivolts = 0;
-                else errorMillivolts -= Math.Sign(errorMillivolts) * deadband;
+                double leftErrorMillivolts = FilterChannel(packet.LeftMillivolts, ref _filteredMillivolts,
+                    ref _hasFilteredValue, filter) - settings.setRowGuidance_centerMillivolts;
+                double errorMillivolts = ApplyDeadband(leftErrorMillivolts,
+                    settings.setRowGuidance_deadbandMillivolts);
                 if (settings.setRowGuidance_invert) errorMillivolts *= -1;
+
+                if (packet.ChannelCount == 2)
+                {
+                    bool hasRightFilter = _hasFilteredRightValue;
+                    double rightFiltered = FilterChannel(packet.RightMillivolts, ref _filteredRightMillivolts,
+                        ref hasRightFilter, filter);
+                    _hasFilteredRightValue = hasRightFilter;
+                    double rightError = ApplyDeadband(rightFiltered - settings.setRowGuidance_rightCenterMillivolts,
+                        settings.setRowGuidance_deadbandMillivolts);
+                    if (settings.setRowGuidance_rightInvert) rightError *= -1;
+                    // Each channel is calibrated so the same physical offset has the same sign.
+                    // Opposing non-neutral readings indicate bad calibration, wiring, or row contact.
+                    if (leftErrorMillivolts != 0 && rightError != 0 &&
+                        Math.Sign(leftErrorMillivolts) != Math.Sign(rightError))
+                    {
+                        rowDataValid = false;
+                        _engagedSinceUtc = DateTime.MinValue;
+                        _hasFilteredValue = false;
+                        _hasFilteredRightValue = false;
+                        status = "Calibrated row-sensor channels disagree";
+                        _candidateSteerAngleDegrees = mode == 1 ? gpsTargetDegrees : 0.0;
+                        return _candidateSteerAngleDegrees;
+                    }
+
+                    errorMillivolts = (errorMillivolts + rightError) / 2.0;
+                }
 
                 double correction = (errorMillivolts / 1000.0) * settings.setRowGuidance_gainDegreesPerVolt;
                 double correctionLimit = Math.Max(0.0, Math.Min(10.0, settings.setRowGuidance_maxCorrectionDegrees));
@@ -186,11 +211,36 @@ namespace AgOpenGPS.Classes.RowGuidance
                 _candidateSteerAngleDegrees = Math.Max(-vehicleLimit, Math.Min(vehicleLimit, candidate));
                 rowAssistReady = true;
                 status = string.Format(CultureInfo.InvariantCulture,
-                    "Fresh row data ({0:F0} ms); candidate {1:F2}°; steering output {2}",
-                    ageSeconds * 1000.0, _candidateSteerAngleDegrees,
+                    "Fresh {0}-channel row data ({1:F0} ms); candidate {2:F2}°; steering output {3}",
+                    packet.ChannelCount, ageSeconds * 1000.0, _candidateSteerAngleDegrees,
                     SteeringOutputEnabled ? "enabled" : "hard-disabled");
                 return _candidateSteerAngleDegrees;
             }
+        }
+
+        private static bool IsUsableChannel(ushort millivolts)
+        {
+            return millivolts >= MinSensorMillivolts && millivolts <= MaxSensorMillivolts;
+        }
+
+        private static double FilterChannel(double sample, ref double filtered, ref bool hasFiltered, double filter)
+        {
+            double alpha = Math.Max(0.05, 1.0 - filter);
+            if (!hasFiltered)
+            {
+                filtered = sample;
+                hasFiltered = true;
+            }
+            else filtered += alpha * (sample - filtered);
+            return filtered;
+        }
+
+        private static double ApplyDeadband(double errorMillivolts, int deadbandSetting)
+        {
+                double deadband = Math.Max(0, deadbandSetting);
+                if (Math.Abs(errorMillivolts) <= deadband) errorMillivolts = 0;
+                else errorMillivolts -= Math.Sign(errorMillivolts) * deadband;
+                return errorMillivolts;
         }
 
         public void SetEngaged(bool engaged)
@@ -200,6 +250,7 @@ namespace AgOpenGPS.Classes.RowGuidance
                 // Start the delay only after fresh packets begin arriving.
                 _engagedSinceUtc = DateTime.MinValue;
                 _hasFilteredValue = false;
+                _hasFilteredRightValue = false;
                 if (!engaged) _candidateSteerAngleDegrees = 0.0;
             }
         }
@@ -237,7 +288,9 @@ namespace AgOpenGPS.Classes.RowGuidance
                         {
                             _latestPacket = packet;
                             _latestPacketUtc = DateTime.UtcNow;
-                            _connectionStatus = "Receiving ROW1 data";
+                            _connectionStatus = packet.ChannelCount == 2
+                                ? "Receiving two row-sensor channels"
+                                : "Receiving one row-sensor channel";
                         }
                     }
                     if (_buffer.Length > 256) _buffer.Clear();
