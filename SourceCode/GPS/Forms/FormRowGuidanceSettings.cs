@@ -16,8 +16,10 @@ namespace AgOpenGPS
     {
         private readonly ComboBox _mode = new ComboBox();
         private readonly ComboBox _port = new ComboBox();
-        private readonly NumericUpDown _center = Number(500, 1000, 4500, 2500, 0);
+        private readonly NumericUpDown _center = Number(100, 1000, 4500, 2500, 0);
         private readonly CheckBox _invert = new CheckBox();
+        private readonly NumericUpDown _rightCenter = Number(100, 500, 4500, 2500, 0);
+        private readonly CheckBox _rightInvert = new CheckBox();
         private readonly NumericUpDown _deadband = Number(100, 0, 500, 40, 0);
         private readonly NumericUpDown _gain = Number(100, 0, 10, 1, 2);
         private readonly NumericUpDown _maxCorrection = Number(100, 0, 10, 3, 1);
@@ -36,7 +38,7 @@ namespace AgOpenGPS
             FormBorderStyle = FormBorderStyle.FixedDialog;
             MaximizeBox = false;
             MinimizeBox = false;
-            ClientSize = new Size(570, 530);
+            ClientSize = new Size(570, 630);
             BackColor = Color.FromArgb(238, 240, 242);
 
             AddLabel("Row guidance mode", 24, 25);
@@ -57,24 +59,31 @@ namespace AgOpenGPS
 
             AddLabel("Centered sensor voltage (mV)", 24, 125);
             Place(_center, 270, 122);
-            _invert.Text = "Invert left/right correction direction";
+            _invert.Text = "Invert channel 1 correction direction";
             _invert.AutoSize = true;
             _invert.Location = new Point(270, 160);
             Controls.Add(_invert);
 
-            AddLabel("Deadband (mV)", 24, 200);
-            Place(_deadband, 270, 197);
-            AddLabel("Correction gain (degrees/volt)", 24, 240);
-            Place(_gain, 270, 237);
-            AddLabel("Maximum correction (degrees)", 24, 280);
-            Place(_maxCorrection, 270, 277);
-            AddLabel("Engage delay (seconds)", 24, 320);
-            Place(_delay, 270, 317);
-            AddLabel("Input filter (0 = off, 1 = heavy)", 24, 360);
-            Place(_filter, 270, 357);
+            AddLabel("Channel 2 center voltage (mV)", 24, 200);
+            Place(_rightCenter, 270, 197);
+            _rightInvert.Text = "Invert channel 2 correction direction";
+            _rightInvert.AutoSize = true;
+            _rightInvert.Location = new Point(270, 235);
+            Controls.Add(_rightInvert);
+
+            AddLabel("Deadband (mV)", 24, 275);
+            Place(_deadband, 270, 272);
+            AddLabel("Correction gain (degrees/volt)", 24, 315);
+            Place(_gain, 270, 312);
+            AddLabel("Maximum correction (degrees)", 24, 355);
+            Place(_maxCorrection, 270, 352);
+            AddLabel("Engage delay (seconds)", 24, 395);
+            Place(_delay, 270, 392);
+            AddLabel("Input filter (0 = off, 1 = heavy)", 24, 435);
+            Place(_filter, 270, 432);
 
             _engage.Text = "Engage row assist";
-            _engage.Location = new Point(24, 410);
+            _engage.Location = new Point(24, 490);
             _engage.Size = new Size(190, 48);
             _engage.BackColor = Color.FromArgb(50, 70, 90);
             _engage.ForeColor = Color.White;
@@ -82,15 +91,15 @@ namespace AgOpenGPS
             _engage.Click += (s, e) => ToggleArm();
             Controls.Add(_engage);
 
-            _status.Location = new Point(230, 406);
+            _status.Location = new Point(230, 486);
             _status.Size = new Size(300, 62);
             _status.Text = "Disarmed. Steering output is disabled in this prototype.";
             Controls.Add(_status);
 
-            var save = new Button { Text = "Save settings", Location = new Point(350, 480), Size = new Size(115, 32) };
+            var save = new Button { Text = "Save settings", Location = new Point(350, 580), Size = new Size(115, 32) };
             save.Click += (s, e) => SaveSettings();
             Controls.Add(save);
-            var close = new Button { Text = "Close", Location = new Point(465, 480), Size = new Size(75, 32) };
+            var close = new Button { Text = "Close", Location = new Point(465, 580), Size = new Size(75, 32) };
             close.Click += (s, e) => Close();
             Controls.Add(close);
 
@@ -134,6 +143,8 @@ namespace AgOpenGPS
             _mode.SelectedIndex = Math.Max(0, Math.Min(2, settings.setRowGuidance_mode));
             _center.Value = Math.Max(_center.Minimum, Math.Min(_center.Maximum, settings.setRowGuidance_centerMillivolts));
             _invert.Checked = settings.setRowGuidance_invert;
+            _rightCenter.Value = Math.Max(_rightCenter.Minimum, Math.Min(_rightCenter.Maximum, settings.setRowGuidance_rightCenterMillivolts));
+            _rightInvert.Checked = settings.setRowGuidance_rightInvert;
             _deadband.Value = Math.Max(_deadband.Minimum, Math.Min(_deadband.Maximum, settings.setRowGuidance_deadbandMillivolts));
             _gain.Value = Math.Max(_gain.Minimum, Math.Min(_gain.Maximum, (decimal)settings.setRowGuidance_gainDegreesPerVolt));
             _maxCorrection.Value = Math.Max(_maxCorrection.Minimum, Math.Min(_maxCorrection.Maximum, (decimal)settings.setRowGuidance_maxCorrectionDegrees));
@@ -172,6 +183,8 @@ namespace AgOpenGPS
             settings.setRowGuidance_comPort = _port.SelectedItem as string ?? string.Empty;
             settings.setRowGuidance_centerMillivolts = (int)_center.Value;
             settings.setRowGuidance_invert = _invert.Checked;
+            settings.setRowGuidance_rightCenterMillivolts = (int)_rightCenter.Value;
+            settings.setRowGuidance_rightInvert = _rightInvert.Checked;
             settings.setRowGuidance_deadbandMillivolts = (int)_deadband.Value;
             settings.setRowGuidance_gainDegreesPerVolt = (double)_gain.Value;
             settings.setRowGuidance_maxCorrectionDegrees = (double)_maxCorrection.Value;
