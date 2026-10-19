@@ -43,7 +43,7 @@ namespace AgOpenGPS
             };
             rowSensorButton.Click += (sender, args) =>
             {
-                using (var diagnostics = new FormRowSensorDiagnostics())
+                using (var diagnostics = new FormRowSensorDiagnostics(mf.rowGuidanceRuntime))
                     diagnostics.ShowDialog(this);
             };
             Controls.Add(rowSensorButton);
@@ -66,7 +66,7 @@ namespace AgOpenGPS
                 };
                 rowGuidanceButton.Click += (sender, args) =>
                 {
-                    using (var settings = new FormRowGuidanceSettings())
+                    using (var settings = new FormRowGuidanceSettings(mf))
                         settings.ShowDialog(this);
                 };
                 Controls.Add(rowGuidanceButton);
