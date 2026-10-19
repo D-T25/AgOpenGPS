@@ -12,6 +12,7 @@ using System.Threading.Tasks;
 using System.Windows.Forms;
 using AgLibrary.Logging;
 using AgOpenGPS.Classes;
+using AgOpenGPS.Classes.RowGuidance;
 using AgOpenGPS.Controls;
 using AgOpenGPS.Core;
 using AgOpenGPS.Core.AgShare;
@@ -98,6 +99,11 @@ namespace AgOpenGPS
         public int flagNumberPicked = 0;
 
         public bool isBtnAutoSteerOn;
+
+        // Experimental row-feeler data path; steering output is hard-disabled
+        // in RowGuidanceRuntime until a verified Windows build and field test.
+        public readonly RowGuidanceRuntime rowGuidanceRuntime = new RowGuidanceRuntime();
+        public bool isRowGuidanceEngaged;
 
         //if we are saving a file
         public bool isSavingFile = false;
@@ -433,6 +439,9 @@ namespace AgOpenGPS
             }
             else Log.EventWriter("Terms Already Accepted");
 
+            if (!string.IsNullOrWhiteSpace(Properties.VehicleSettings.Default.setRowGuidance_comPort))
+                rowGuidanceRuntime.Connect(Properties.VehicleSettings.Default.setRowGuidance_comPort, out _);
+
             this.MouseWheel += ZoomByMouseWheel;
 
             //The way we subscribe to the System Event to check when Power Mode has changed.
@@ -725,6 +734,7 @@ namespace AgOpenGPS
             finally
             {
                 // Ensure application exits even if shutdown fails
+                rowGuidanceRuntime.Dispose();
                 Application.Exit();
             }
         }
