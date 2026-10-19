@@ -173,6 +173,8 @@ namespace AgOpenGPS
                     if (isBtnAutoSteerOn)
                     {
                         isBtnAutoSteerOn = false;
+                        isRowGuidanceEngaged = false;
+                        rowGuidanceRuntime.SetEngaged(false);
                         btnAutoSteer.Image = trk.isAutoSnapToPivot ? Properties.Resources.AutoSteerOffSnapToPivot : Properties.Resources.AutoSteerOff;
                         //if (yt.isYouTurnBtnOn) btnAutoYouTurn.PerformClick();
                         if (sounds.isSteerSoundOn) sounds.sndAutoSteerOff.Play();
@@ -192,6 +194,8 @@ namespace AgOpenGPS
             if (isBtnAutoSteerOn)
             {
                 isBtnAutoSteerOn = false;
+                isRowGuidanceEngaged = false;
+                rowGuidanceRuntime.SetEngaged(false);
                 btnAutoSteer.Image = trk.isAutoSnapToPivot ? Properties.Resources.AutoSteerOffSnapToPivot : Properties.Resources.AutoSteerOff;
                 //if (yt.isYouTurnBtnOn) btnAutoYouTurn.PerformClick();
                 if (sounds.isSteerSoundOn) sounds.sndAutoSteerOff.Play();
