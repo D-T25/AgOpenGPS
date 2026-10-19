@@ -48,6 +48,30 @@ namespace AgOpenGPS
             };
             Controls.Add(rowSensorButton);
 
+            // Keep row-guidance setup available only for the Harvester profile.
+            // This screen configures and tests the operator controls; it does not
+            // yet modify AOG's steering target.
+            if (mf.vehicle.VehicleConfig.Type == VehicleType.Harvester)
+            {
+                var rowGuidanceButton = new Button
+                {
+                    Text = "Row Guidance\nSetup",
+                    Location = new Point(640, 558),
+                    Size = new Size(125, 64),
+                    BackColor = Color.FromArgb(50, 70, 90),
+                    ForeColor = Color.White,
+                    FlatStyle = FlatStyle.Flat,
+                    Font = new Font("Microsoft Sans Serif", 10F, FontStyle.Bold),
+                    UseVisualStyleBackColor = false
+                };
+                rowGuidanceButton.Click += (sender, args) =>
+                {
+                    using (var settings = new FormRowGuidanceSettings())
+                        settings.ShowDialog(this);
+                };
+                Controls.Add(rowGuidanceButton);
+            }
+
             nudMaxCounts.Controls[0].Enabled = false;
 
             nudSnapDistance.Controls[0].Enabled = false;
